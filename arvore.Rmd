@@ -1,0 +1,354 @@
+---
+title: Implementação em R para estimativa de árvore de contexto para processos de
+  memória não necessariamente finita, por meio de BIC e MDL
+author: "Kelvyn Donavan Aureliano Santos"
+date: "2023-12-15"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+# Resumo
+
+Este trabalho aborda a modelagem avançada de processos estocásticos por meio de Cadeias de Markov de Ordem Variável (VOMC) e Estimativa de Árvore de Contexto (EAC). Inicialmente, introduzimos as Cadeias de Markov, destacando a limitação das versões de ordem fixa e apresentando as VOMC, que permitem variação na ordem dependendo do estado atual. Em seguida, exploramos a EAC como uma extensão desses conceitos, destacando a capacidade de modelar processos com dependências de longo alcance.
+
+A metodologia empregada envolve a Estimativa de Árvore de Contexto para Processos de Memória Não Necessariamente Finitos, utilizando Critério de Informação Bayesiano (BIC) e Comprimento Mínimo de Descrição (MDL). Aplicamos essas técnicas a dados de precipitação em Belo Horizonte, possibilitando a compreensão e modelagem de padrões complexos em processos estocásticos.
+
+O estudo destaca a eficácia dessa abordagem avançada na análise e previsão de eventos, evidenciando a flexibilidade das VOMC e a capacidade de adaptação da EAC. Além disso, apresentamos a poda da árvore como uma estratégia eficiente para simplificar modelos sem perda significativa de informação. Os resultados indicam uma poderosa ferramenta para entender e modelar processos estocásticos em diversas áreas de aplicação.
+
+# Introdução
+
+**Modelagem de Processos Estocásticos**
+
+A modelagem de processos estocásticos é essencial para compreender e prever eventos em diversas áreas, desde finanças até meteorologia. Entre as abordagens, as Cadeias de Markov oferecem um quadro eficaz para representar transições entre estados discretos. Neste trabalho, exploramos uma extensão desse conceito: as Cadeias de Markov de Ordem Variável e a Estimativa de Árvore de Contexto.
+
+**Cadeias de Markov de Ordem Fixa e Variável**
+
+Uma Cadeia de Markov de ordem fixa modela transições de estados baseadas em uma quantidade fixa de estados anteriores. Essa estrutura fornece uma visão simplificada, onde a probabilidade de transição depende apenas dos últimos "n" estados. No entanto, a realidade muitas vezes exige flexibilidade. As Cadeias de Markov de Ordem Variável expandem essa flexibilidade, permitindo que a ordem mude dependendo do estado atual.
+
+**Estimativa de Árvore de Contexto**
+
+A Estimativa de Árvore de Contexto é uma evolução natural das Cadeias de Markov, projetada para lidar com processos estocásticos nos quais a dependência do estado atual não é rigidamente fixa. Cada nó na árvore representa um "contexto", ou seja, estados passados relevantes para prever o próximo estado. Esta abordagem mais abrangente possibilita lidar com processos que exibem "memória" ou dependências de longo alcance.
+
+**Metodologia de Estimativa e Poda**
+
+A metodologia adotada neste estudo envolve a Estimativa de Árvore de Contexto para Processos de Memória Não Necessariamente Finitos, utilizando Critério de Informação Bayesiano (BIC) e Comprimento Mínimo de Descrição (MDL). Essas ferramentas avaliam a complexidade do modelo em relação ao ajuste aos dados, permitindo uma poda eficiente da árvore.
+
+**Objetivo do Estudo**
+
+Nosso foco não está apenas na aplicação desta metodologia avançada a um conjunto de dados específico; ao contrário, o uso de dados de precipitação em Belo Horizonte foi uma forma de testar a funcionalidade do nosso código. A ênfase principal é compreender a metodologia em si e implementar um código em R, sendo o conjunto de dados utilizado apenas como uma ilustração prática.
+
+------------------------------------------------------------------------
+
+**Abstract**
+
+**Title: Implementation in R for Context Tree Estimation for Not Necessarily Finite Memory Processes, Via BIC and MDL**
+
+**Modeling Stochastic Processes**
+
+The modeling of stochastic processes is essential for understanding and predicting events in various fields, from finance to meteorology. Among the approaches, Markov Chains offer an effective framework for representing transitions between discrete states. In this work, we explore an extension of this concept: Variable Order Markov Chains and Context Tree Estimation.
+
+**Fixed and Variable Order Markov Chains**
+
+A fixed-order Markov Chain models state transitions based on a fixed number of previous states. This structure provides a simplified view, where the transition probability depends only on the last "n" states. However, reality often requires flexibility. Variable Order Markov Chains expand this flexibility, allowing the order to change depending on the current state.
+
+**Context Tree Estimation**
+
+Context Tree Estimation is a natural evolution of Markov Chains, designed to handle stochastic processes in which the dependence on the current state is not rigidly fixed. Each node in the tree represents a "context," i.e., past states relevant for predicting the next state. This more comprehensive approach enables dealing with processes exhibiting "memory" or long-range dependencies.
+
+**Estimation and Pruning Methodology**
+
+The methodology adopted in this study involves Context Tree Estimation for Processes with Non-Necessarily Finite Memory, using Bayesian Information Criterion (BIC) and Minimum Description Length (MDL). These tools assess the model's complexity in relation to data fit, allowing efficient tree pruning.
+
+**Study Objective**
+
+Our focus is not solely on the application of this advanced methodology to a specific dataset; rather, using precipitation data from Belo Horizonte served as a means to test the functionality of our code. The primary emphasis is on comprehending the methodology itself and implementing a code in R, with the dataset used only as a practical illustration
+
+# Desenvolvimento
+
+**Cadeias de Markov de Ordem Fixa**
+
+Uma cadeia de Markov de ordem fixa é um modelo estocástico que passa de um estado para outro dentro de um conjunto finito de estados. A probabilidade de transição de um estado para outro depende apenas dos **n** estados anteriores, onde **n** é a ordem da cadeia.
+
+Por exemplo, uma cadeia de Markov de primeira ordem, a probabilidade de ir para qualquer estado particular depende apenas do estado atual.
+
+```{r echo=FALSE, warning=FALSE}
+# Exemplo de uma cadeia de Markov de primeira ordem
+if (!require(markovchain)) install.packages("markovchain")
+library(markovchain)
+states <- c("Chuva", "Sol")
+transition_matrix <- matrix(data = c(0.7, 0.3, 0.4, 0.6), byrow = TRUE, nrow = 2)
+rownames(transition_matrix) <- colnames(transition_matrix) <- states
+mc <- new("markovchain", states = states, transitionMatrix = transition_matrix)
+mc
+```
+
+Nome dos Estados: "Chuva" e "Sol", indicando os dois estados possíveis do sistema.
+
+Matriz de Transição: Esta matriz define as probabilidades de transição entre os estados.
+
+No exemplo, a transição da "Chuva" para "Chuva" tem uma probabilidade de 0,7, a transição da "Chuva" para "Sol" tem uma probabilidade de 0,3, a transição de "Sol" para "Chuva" tem uma probabilidade de 0,4 e a transição de "Sol" para "Sol" tem uma probabilidade de 0,6. Essa matriz de transição é fundamental para entender como a cadeia de Markov se comporta ao longo do tempo. Pode-se interpretar que, dado o estado atual do sistema (Chuva ou Sol), essas probabilidades definem as chances de transição para outros estados no próximo intervalo de tempo.
+
+**Cadeias de Markov de Ordem Variável**
+
+As Cadeias de Markov de Ordem Variável representam uma evolução das tradicionais Cadeias de Markov de Ordem Fixa. A principal diferença é a capacidade de adaptar a ordem da cadeia conforme necessário, tornando a transição de um estado para outro dependente de um número variável de estados anteriores.
+
+*Princípio Fundamental*: Essencialmente, nas Cadeias de Ordem Variável, a probabilidade de transição é condicional a um conjunto variável de estados anteriores, proporcionando maior flexibilidade na modelagem de sistemas dinâmicos.
+
+*Exemplo Simplificado*: Imagine um modelo meteorológico com três estados: Ensolarado, Nublado e Chuvoso. Em uma Cadeia de Ordem Variável, a transição para um dia chuvoso pode depender dos estados anteriores, podendo variar conforme o contexto.
+
+*Benefícios na Modelagem*: A adaptabilidade da ordem da cadeia permite modelar com precisão padrões complexos e variáveis. Isso é valioso para capturar dependências que podem variar ao longo do tempo ou em resposta a diferentes condições.
+
+Em resumo, as Cadeias de Markov de Ordem Variável oferecem uma ferramenta flexível para modelar processos estocásticos mais complexos, proporcionando uma representação dinâmica das relações entre eventos sucessivos em sistemas dinâmicos.
+
+*Estimativa de Árvore de Contexto para Processos de Memória Não Necessariamente Finitos, Via BIC e MDL* O método de Estimativa de Árvore de Contexto para Processos de Memória Não Necessariamente Finitos, Via BIC e MDL, é uma técnica avançada que permite modelar processos estocásticos complexos.
+
+Veremos como este método funciona no capítulo metodologia a seguir.
+
+# Metodologia
+
+**1. Definição da Árvore de Contexto**: A primeira etapa é definir a árvore de contexto. Cada nó na árvore representa um “contexto”, que é um estado passado que é relevante para prever o próximo estado. A árvore de contexto pode ter profundidade infinita, o que significa que pode haver uma quantidade infinita de contextos.
+
+**2. Estimativa da Árvore de Contexto**: A próxima etapa é estimar a árvore de contexto a partir dos dados. Isso é feito otimizando um critério para árvores de contexto hipotéticas de profundidade finita, permitidas para crescer com o tamanho da amostra n como o (log n).
+
+**3. Uso do BIC e MDL**: O Critério de Informação Bayesiano (BIC) e o Comprimento Mínimo de Descrição (MDL) são usados para fornecer estimadores fortemente consistentes da árvore de contexto. Esses princípios são usados para escolher a melhor estrutura de covariância dos erros.
+
+**4. Cálculo dos Estimadores**: Algoritmos são fornecidos para calcular esses estimadores em tempo O(n), e para calculá-los on-line para todos i menores que n em tempo o(n log n).
+
+**5. Poda da Árvore**: A poda da árvore é um processo de otimização que envolve a remoção de ramos (ou “nós”) da árvore de contexto que não contribuem significativamente para a previsão do próximo estado do processo. O BIC e o MDL são usados para determinar quais ramos devem ser podados. Esses critérios levam em consideração a complexidade do modelo (ou seja, o número de ramos na árvore de contexto) e o ajuste do modelo aos dados.
+
+Iniciamos carregando as bibliotecas necessárias e um conjunto de dados.
+
+Estamos utilizando o banco que contém dados de precipitação diária na cidade de Belo Horizonte no peíodo de 01/01/2023 até 31/05/2023. O objetivo é modelar a probabilidade de eventos de precipitação futuros com base nos dados históricos.
+
+```{r warning=FALSE}
+# Carregar bibliotecas
+rm(list = ls())
+if (!require(pacman)) install.packages("pacman")
+pacman::p_load(readxl, dplyr, igraph, data.tree, tinytex,xfun)
+
+# Carregar dados
+Dados <- read_excel("precipitacao bh.xlsx")
+
+```
+
+# Manipulação
+
+1.  **Agrupação e Sumarização:**
+    -   Os dados são agrupados pela coluna `Data`.
+    -   Para cada grupo de datas, é calculada a soma da precipitação, e o resultado é armazenado na nova coluna chamada `SomaChuva`.
+2.  **Adição de uma Nova Coluna:**
+    -   Uma nova coluna chamada `Chuva` é adicionada.
+    -   O valor dessa coluna é 1 se a soma da precipitação (`SomaChuva`) é maior que 0, e 0 caso contrário.
+3.  **Extração de Dados Numéricos:**
+    -   A terceira coluna do dataframe resultante (`SomaChuva`) é extraída.
+    -   Essa coluna é convertida para um vetor numérico e atribuída à variável `dados`.
+
+```{r}
+# Agrupar dados por data e calcular a soma da precipitação
+Dados_agrupados <- Dados %>%
+  group_by(Data) %>%
+  summarize(SomaChuva = sum(Precipitacao)) %>%
+  mutate(Chuva = ifelse(SomaChuva > 0, 1, 0))
+
+# Extrair dados numéricos para análise
+dados <- as.numeric(Dados_agrupados[[3]])
+dados
+```
+
+```{r}
+# Determinar o alfabeto da amostra
+alfabeto <- sort(unique(dados))
+
+# Inicializar lista para armazenar camadas de contexto
+camadas_contextos <- list()
+
+# Criar primeira camada
+camadas_contextos[[1]] <- lapply(alfabeto, function(x) c(x))
+
+# Criar camadas subsequentes para diferentes ordens
+num_camadas <- floor(log(length(dados)))
+for (camada in 1:num_camadas) {
+  contextos <- list()
+  if (!is.null(camadas_contextos[[1]])) {
+    for (contexto in camadas_contextos[[camada]]) {
+      for (valor in alfabeto) {
+        novo_contexto <- c(valor, unlist(contexto))
+        contextos <- append(contextos, list(novo_contexto))
+      }
+    }
+  }
+  camadas_contextos[[camada + 1]] <- contextos
+}
+```
+
+# Cálculo de Verossimilhança
+
+Podemos calcular a logverossimilhança de cada contexto da árvore cheia a partir da expressão: $\text{loglike} = \log\left(\frac{Nsa}{Ns} \cdot Nsa\right)$ Onde $Nsa$ representa o número de ocorrências do evento de interesse, e $Ns$ representa o número de ocorrências que possibilitam a ocorrência do evento de interesse.
+
+Isto é, seja $sa$ = 00, então $s$ = 0.
+
+Basta contar quantas vezes aparece o símbolo 00 na amostra para obter $Nsa$, e contar quantas vezes aparece o símbolo 0 para obter $Ns$.
+
+De acordo com a necessidade do pesquisador, contextos, que possuem baixa quantidade de ocorrências, podem ser desconsiderados na análise.
+
+Fizemos número mínimo de ocorrências = 3.
+
+```{r}
+  # Função para contar ocorrências de uma sequência específica
+  funcao_contagens <- function(meu_vetor, sequencia_especifica) {
+    contagem <- 0
+    for (i in 1:(length(meu_vetor) - length(sequencia_especifica) + 1)) {
+      if (identical(meu_vetor[i:(i + length(sequencia_especifica) - 1)], sequencia_especifica)) {
+        contagem <- contagem + 1
+      }
+    }
+    return(contagem)
+  }
+  
+  # Criar árvore com verossimilhanças
+  verossimilhancas <- list()
+  cont <- 3 # mínimo de ocorrências para um contexto ser considerado
+  
+  for (i in 1:(length(camadas_contextos)-1)) {
+    lista <- list()
+    for (j in 1:length(camadas_contextos[[i]])) {
+      for (k in 1:length(camadas_contextos[[i+1]])) {
+        a <- unlist(camadas_contextos[[i]][j])
+        b <- unlist(camadas_contextos[[i+1]][k])
+        # Verifica se a sequência é uma extensão válida
+        if (identical(a, b[seq_along(a)]) && b[length(b)] == 0 && funcao_contagens(dados, b) >= cont) {
+          Ns <- funcao_contagens(dados, unlist(camadas_contextos[[i]][j]))
+          Nsa <- funcao_contagens(dados, unlist(camadas_contextos[[i+1]][k]))
+          loglike <- log((Nsa/Ns) * Nsa)
+          temp <- list("numerador" = camadas_contextos[[i+1]][k],
+                       "denominador" = camadas_contextos[[i]][j],
+                       "loglike" = loglike)
+          lista <- c(lista, list(temp))
+        }
+      }
+    }
+    verossimilhancas[[i]] <- lista
+  }
+```
+
+# Poda da Árvore
+
+A poda da árvore no método de Estimativa de Árvore de Contexto para Processos de Memória Não Necessariamente Finitos, Via BIC e MDL, é um processo de otimização que envolve a remoção de ramos (ou "nós") da árvore de contexto que não contribuem significativamente para a previsão do próximo estado do processo.
+
+O Critério de Informação Bayesiano (BIC) e o Comprimento Mínimo de Descrição (MDL) são usados para determinar quais ramos devem ser podados. Esses critérios levam em consideração a complexidade do modelo (ou seja, o número de ramos na árvore de contexto) e o ajuste do modelo aos dados. O objetivo é encontrar o equilíbrio certo entre a complexidade e o ajuste, de modo que o modelo seja suficientemente simples, mas ainda assim faça previsões precisas.
+
+Os ramos que são menos informativos ou que contribuem menos para a previsão do próximo estado são removidos da árvore de contexto. Isso é feito comparando a probabilidade dos dados sob o modelo completo (com o ramo) com a probabilidade dos dados sob o modelo reduzido (sem o ramo). Se a remoção do ramo não resultar em uma diminuição significativa na probabilidade dos dados, então o ramo é podado.
+
+O grande problema é que para comparar o BIC de cada modelo, precisamos modelar cada combinação possível da árvore, o que é muito custoso, computacionalmente falando.
+
+Mas de acordo com Imre Csiszár, podemos encontrar a árvore do melhor modelo, dentre os modelos possíveis a partir da amostra, comparando a logverossimilhança do nó pai com o produto da logverossimilhança dos nós filhos. Segundo Csiszár, quando a logverossimilhança do nó pai é maior que o produto das logverossimilhancas dos nós filhos, isto significa que os nós filhos são pouco informativos, isto é, não contribuem significativamente para a estimação do estado atua, então são podados da árvore cheia.
+
+```{r}
+# Função para calcular o produto das verossimilhanças dos filhos
+produto_verossimilhancas_filhos <- function(nos_filhos) {
+  produto = 1
+  for (no_filho in nos_filhos) {
+    produto = produto * no_filho$loglike
+  }
+  return(produto)
+}
+
+# Função para criar árvore podada
+criar_arvore_podada <- function(verossimilhancas) {
+  arvore_podada <- verossimilhancas
+  for (i in 1:(length(verossimilhancas)-1)) {
+    nos = verossimilhancas[[i]]
+    for (j in 1:length(nos)) {
+      no = nos[[j]]
+      nos_filhos = lapply(verossimilhancas[[i+1]], function(x) {
+        if (identical(no$numerador, x$denominador)) {
+          return(x)
+        } else {
+          return(NULL)
+        }
+      })
+      nos_filhos = nos_filhos[!sapply(nos_filhos, is.null)]
+      if (length(nos_filhos) > 0) {
+        if (no$loglike > produto_verossimilhancas_filhos(nos_filhos)) {
+          no$indicador = 0
+        } else {
+          no$indicador = 1
+        }
+      }
+      arvore_podada[[i]][[j]] = no
+    }
+  }
+  return(arvore_podada)
+}
+
+# Criar árvore podada
+arvore_podada = criar_arvore_podada(verossimilhancas)
+```
+
+```{r}
+# Função para remover elementos iguais a zero
+remover_elementos <- function(lista_atual) {
+  for (i in 1:(length(lista_atual)-1)) {
+    for (j in 1:length(lista_atual[[i]])) {
+      if (!identical(lista_atual[[i]][[j]], 0)) {
+        if (lista_atual[[i]][[j]]$indicador == 0) {
+          # Remover ramos abaixo
+          begin <- 1
+          for (k in (i+1):length(lista_atual)) {
+            for (l in 1:length(lista_atual[[k]])) {
+              if (!identical(lista_atual[[k]][[l]], 0)) {
+                if (identical(unlist(lista_atual[[i]][[j]]$numerador),
+                              tail(unlist(lista_atual[[k]][[l]]$numerador), -begin))) {
+                  lista_atual[[k]][[l]] <- 0
+                }
+              }
+            }
+            begin <- begin + 1
+          }
+        }
+      }
+    }
+  }
+  return(lista_atual)
+}
+
+# Aplicar a remoção de elementos
+arvore_final <- remover_elementos(arvore_podada)
+
+# Remover elementos iguais a zero
+arvore_final <- lapply(arvore_final, function(x) {
+  if (is.list(x)) {
+    return(x[sapply(x, function(y) any(unlist(y) != 0))])
+  } else {
+    return(x)
+  }
+})
+
+# Imprimir a lista resultante
+arvore_final
+```
+
+# Conclusão
+
+Este estudo explorou a metodologia avançada de Estimativa de Árvore de Contexto para Processos de Memória Não Necessariamente Finitos, utilizando Critério de Informação Bayesiano (BIC) e Comprimento Mínimo de Descrição (MDL). Ao aplicar essa abordagem inovadora a dados de precipitação em Belo Horizonte, buscamos compreender e modelar padrões complexos em processos estocásticos.
+
+A flexibilidade oferecida pelas Cadeias de Markov de Ordem Variável e pela Estimativa de Árvore de Contexto revelou-se crucial para lidar com a dinâmica de processos estocásticos que exibem dependências de longo alcance. A adaptação da ordem da cadeia conforme necessário proporcionou uma representação mais precisa de sistemas dinâmicos, capturando nuances e padrões variáveis ao longo do tempo.
+
+A metodologia de poda da árvore, utilizando o BIC e o MDL, destacou-se como uma estratégia eficaz para simplificar modelos sem perda significativa de informação. A remoção de ramos menos informativos contribuiu para a construção de modelos mais enxutos, facilitando a interpretação e o entendimento dos processos subjacentes.
+
+Embora tenhamos utilizado dados específicos de precipitação como exemplo prático, é importante ressaltar que nosso foco principal não está na aplicação a um conjunto de dados específico. Em vez disso, essa aplicação foi um meio de testar a funcionalidade do código desenvolvido. Nosso objetivo principal foi compreender a metodologia em si e implementar um código eficiente em R.
+
+Concluímos, assim, que a Estimativa de Árvore de Contexto para Processos de Memória Não Necessariamente Finitos, associada ao BIC e ao MDL, é uma ferramenta valiosa na modelagem de processos estocásticos. A capacidade de adaptar a ordem da cadeia e podar a árvore conforme necessário oferece uma abordagem flexível e eficiente para a análise e previsão de eventos em uma variedade de contextos. Essa metodologia avançada tem o potencial de contribuir significativamente para diversas áreas de pesquisa e aplicação prática, proporcionando insights mais precisos em processos complexos e dinâmicos.
+
+# Referências
+
+1.  Csiszár, I. (2006). Context Tree Estimation for Not Necessarily Finite Memory Processes, Via BIC and MDL.
+
+2.  R Core Team (2022). R: A language and environment for statistical computing. R Foundation for Statistical Computing, Vienna, Austria. URL <https://www.R-project.org/>.
+
+3.  Wickham, H., Averick, M., Bryan, J., Chang, W., McGowan, L. D., François, R., … & Yutani, H. (2019). Welcome to the tidyverse. Journal of Open Source Software, 4(43), 1686.
+
+4.  Cadeias de Markov de Ordem Fixa: Cadeias de Markov - UFSC Cadeias de Markov - Wikipédia Cadeias de Markov - Moodle USP: e-Disciplinas.
+
+5.  Cadeias de Markov de Ordem Variável: Processos de Markov - UFPE Cadeias de Markov - Portal do IFSC Cadeias estocásticas com memória de alcance variável.
